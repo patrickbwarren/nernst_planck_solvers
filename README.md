@@ -1,7 +1,5 @@
 # Nernst-Planck solvers
 
-##Solvers for Nernst-Planck equations
-
 See "Non-Faradaic electric currents in the Nernst-Planck equations and
 non-local diffusiophoresis of suspended colloids in crossed salt
 gradients", P. B. Warren, [Phys. Rev. Lett. 124, 248004 (2020)](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.124.248004)
@@ -38,7 +36,7 @@ Further examples in the shell scripts.
 
 `crossgrad_solver.f90` - FORTRAN 90 driver code, reads run config `.rc` file and runs a complete calculation.
 
-`crossgrad_creator.py` - python script to generate the run config and initial converged solution to the inhomogeneous Poisson equation.
+`crossgrad_creator.py` - python script to generate the run config and initial converged solution to the inhomogeneous Poisson equation (Eq. (4) in the above PRL).
 
 `crossgrad_viewer.py` - reads FORTRAN data files and generates images: to view on the screen use `--show`
 
