@@ -24,6 +24,7 @@ with open(args.rc) as fp:
     run_name = fp.readline().split()[0]
     ions = fp.readline().split()
     nx, ny, ncmp = [int(v) for v in fp.readline().split()[0:3]]
+    bc = [int(v) for v in fp.readline().split()[0:8]]
     z = [int(v) for v in fp.readline().split()[0:ncmp]]
     d = [float(v) for v in fp.readline().split()[0:ncmp]]
     dt = float(fp.readline().split()[0])
@@ -35,6 +36,7 @@ with open(args.rc) as fp:
 print('run_control: run_name = ', run_name)
 print('run_control: ions = ', ions)
 print('run_control: nx, ny, ncmp = ', nx, ny, ncmp)
+print('run_control: boundary_conditions = ', bc)
 print('run_control: z = ', z)
 print('run_control: d = ', d)
 print('run_control: dt = ', dt)
@@ -46,12 +48,12 @@ epsr, eps0, eta = 78.0, 8.854e-12, 0.89e-3
 kTbye = kB*T/e
 prefac = epsr*eps0/eta * kTbye**2 * 1e9 # in um^2 / ms
 ezetabykT = args.zeta*1e-3 / kTbye # zeta in mV
-a = 4.0*prefac*np.log(np.cosh(ezetabykT/4.0))
-b = prefac*ezetabykT
+A = 4.0*prefac*np.log(np.cosh(ezetabykT/4.0))
+B = prefac*ezetabykT
 
 print('kTbye [mV] = %0.2f' % (kTbye*1e3))
 print('prefac [um^2 / ms] = %0.3f' % prefac)
-print('drift coefficients A, B [um^2/ms] = ', a, b)
+print('drift coefficients A, B [um^2/ms] = ', A, B)
 
 deltax = args.Lx / (nx - 1)
 deltat = dt * deltax**2
@@ -73,7 +75,7 @@ else:
 
 for frame in range(nframes+1):
 
-    data_file = '%s_%05i.dat' % (run_name, frame)
+    data_file = '%s_f%05i.dat' % (run_name, frame)
 
     print('reading data from', data_file)
 
@@ -99,8 +101,8 @@ for frame in range(nframes+1):
     sigma = np.zeros((nx, ny))
     for k in range(ncmp): sigma += z[k]**2 * d[k] * rho[k, :, :]
 
-    salinity = np.zeros((nx, ny))
-    for k in range(ncmp): salinity += rho[k, :, :]
+    rhotot = np.zeros((nx, ny))
+    for k in range(ncmp): rhotot += rho[k, :, :]
 
     if frame == 0:
         with open(fingerprint) as fp:
@@ -113,7 +115,7 @@ for frame in range(nframes+1):
 
     gy, gx = np.gradient(g)
     ey, ex = [-v for v in np.gradient(phi)]
-    lnsy, lnsx = np.gradient(np.log(salinity))
+    lnry, lnrx = np.gradient(np.log(rhotot))
 
     ix, iy = [np.multiply(sigma, e) - gradg for e, gradg in zip([ex, ey], [gx, gy])]
     ixy, ixx = np.gradient(ix)
@@ -134,28 +136,29 @@ for frame in range(nframes+1):
     print('diagnostic: (estd)    |∇ ⨯ I| =', np.sqrt(np.sum(approx_curl**2)))
     print('diagnostic: (python) Σi zi ρi =', sumrhoz)
 
-    lnsx_spline = spline2d(x, y, lnsx)
-    lnsy_spline = spline2d(x, y, lnsy)
+    lnrx_spline = spline2d(x, y, lnrx)
+    lnry_spline = spline2d(x, y, lnry)
 
-    lnspx = lnsx_spline(px, py, grid=False)
-    lnspy = lnsy_spline(px, py, grid=False)
+    lnrpx = lnrx_spline(px, py, grid=False)
+    lnrpy = lnry_spline(px, py, grid=False)
 
     ex_spline = spline2d(x, y, ex)
     ey_spline = spline2d(x, y, ey)
+    
     epx = ex_spline(px, py, grid=False)
     epy = ey_spline(px, py, grid=False)
 
     if args.single:
         i, j = [np.rint(p/deltax).astype(np.int)[0] for p in [px, py]]
-        print('spline2d: grad ln s(%0.2f, %0.2f) = %g %g' % (px[0], py[0], lnspx[0], lnspy[0]))
-        print('spline2d: grad ln s(%2i, %2i)       = %g %g' % (i, j, lnsx[i, j], lnsy[i, j]))
+        print('spline2d: grad ln s(%0.2f, %0.2f) = %g %g' % (px[0], py[0], lnrpx[0], lnrpy[0]))
+        print('spline2d: grad ln s(%2i, %2i)       = %g %g' % (i, j, lnrx[i, j], lnry[i, j]))
         print('spline2d: e(%0.2f, %0.2f) = %g %g' % (px[0], py[0], epx[0], epy[0]))
         print('spline2d: e(%2i, %2i)       = %g %g' % (i, j, ex[i, j], ey[i, j]))
 
     # correct for the gradients assuming unit lattice spacing
     
-    ux = (a*lnspx + b*epx) / deltax
-    uy = (a*lnspy + b*epy) / deltax
+    ux = (A*lnrpx + B*epx) / deltax
+    uy = (A*lnrpy + B*epy) / deltax
 
     t = frame * nsave * deltat
 
@@ -164,8 +167,8 @@ for frame in range(nframes+1):
 
     for k in range(len(px)):
         print('%03i %10.3f %3i : px, py = %10.3f %10.3f (position)' % (frame, t, k, px[k], py[k]))
-        print('%03i %10.3f %3i : ux, uy = %10.5f %10.5f (chemiphoresis)' % (frame, t, k, a*lnspx[k], a*lnspy[k]))
-        print('%03i %10.3f %3i : ux, uy = %10.5f %10.5f (electrophoresis)' % (frame, t, k, b*epx[k], b*epy[k]))
+        print('%03i %10.3f %3i : ux, uy = %10.5f %10.5f (chemiphoresis)' % (frame, t, k, A*lnrpx[k], A*lnrpy[k]))
+        print('%03i %10.3f %3i : ux, uy = %10.5f %10.5f (electrophoresis)' % (frame, t, k, B*epx[k], B*epy[k]))
         print('%03i %10.3f %3i : ux, uy = %10.5f %10.5f (total)' % (frame, t, k, ux[k], uy[k]))
         print('%03i %10.3f %3i : dx, dy = %10.5f %10.5f (displacement)' % (frame, t, k, dx[k], dy[k]))
 
