@@ -5,7 +5,7 @@
 jobname=xdisclarge
 
 size=200
-shape=005,0.125,0.025
+shape=0.05,0.125,0.025
 run_control="--njacobi=10000 --niter=40"
 grad=0.1,1
 
