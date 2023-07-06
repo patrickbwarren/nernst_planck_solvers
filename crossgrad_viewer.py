@@ -191,7 +191,7 @@ for k in range(ncmp):
     rhomin, rhomax = np.min(rho[k, :, :]), np.max(rho[k, :, :])
     print('minmax: rho', ions[k], '=', rhomin, rhomax)
 
-rho_levels = list(np.linspace(0.0, 2.0, 11))
+rho_levels = list(np.linspace(0.0, 1.0, 11))
 print('rho levels', rho_levels)
 
 if not args.show and not args.save: exit()
@@ -219,16 +219,18 @@ if args.drift or args.detail:
 
     if args.detail:
         plt.subplot(2, 3, 3)
-        plt.contour(x, y, rhox, r_levels, colors='black')
+        # plt.contour(x, y, rhox, r_levels, colors='black')
+        print('r_levels =', r_levels)
         plt.imshow(rhox, extent=[0.0, Lx, 0.0, Ly], origin='lower', cmap='viridis',
                    vmin=r_levels[0], vmax=r_levels[-1], alpha=0.5)
         if args.zoom > 1.0:
             zf = 1.0 / args.zoom
             plt.axis([0.5*(1-zf)*Lx, 0.5*(1+zf)*Lx, 0.5*(1-zf)*Lx, 0.5*(1+zf)*Lx])
+        plt.plot(x, 20+20*rhox[100, :], 'k') 
         plt.title(' : '.join(ions[0:2]))
     else:
         plt.subplot(2, 3, 3)
-        plt.contour(x, y, rhotot, r_levels, colors='black')
+        #plt.contour(x, y, rhotot, r_levels, colors='black')
         plt.imshow(rhotot, extent=[0.0, Lx, 0.0, Ly], origin='lower', cmap='viridis',
                    vmin=r_levels[0], vmax=r_levels[-1], alpha=0.5)
         plt.title('ρ_tot')
@@ -263,12 +265,13 @@ if args.drift or args.detail:
 
     if args.detail:
         plt.subplot(2, 3, 6)
-        plt.contour(x, y, rhoy, r_levels, colors='black')
+        #plt.contour(x, y, rhoy, r_levels, colors='black')
         plt.imshow(rhoy, extent=[0.0, Lx, 0.0, Ly], origin='lower', cmap='viridis',
                    vmin=r_levels[0], vmax=r_levels[-1], alpha=0.5)
         if args.zoom > 1.0:
             zf = 1.0 / args.zoom
             plt.axis([0.5*(1-zf)*Lx, 0.5*(1+zf)*Lx, 0.5*(1-zf)*Lx, 0.5*(1+zf)*Lx])
+        plt.plot(x, 20+20*rhoy[100, :], 'k') 
         plt.title(' : '.join(ions[2:4]))
     else:
         plt.subplot(2, 3, 6)

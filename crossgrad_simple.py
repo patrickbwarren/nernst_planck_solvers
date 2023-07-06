@@ -4,6 +4,7 @@
 import re
 import argparse
 import numpy as np
+from numpy import exp
 from scipy.special import erf
 from crossgrad import crossgrad as cg
 
@@ -12,8 +13,8 @@ parser.add_argument("name", action='store', help="run name")
 parser.add_argument("--ionx", action='store', default="Na1Cl1", help="list of ions")
 parser.add_argument("--iony", action='store', default="K1Br1", help="list of ions")
 parser.add_argument("--ionb", action='store', default="Li1OH1", help="list of ions")
-parser.add_argument("--cx", action='store', default="0.01,1", help="ion gradient in x")
-parser.add_argument("--cy", action='store', default="0.01,1", help="ion gradient in y")
+parser.add_argument("--cx", action='store', default="0.1,1", help="ion gradient in x")
+parser.add_argument("--cy", action='store', default="0.1,1", help="ion gradient in y")
 parser.add_argument("--back", action='store', default=None, help="background ion concentration")
 parser.add_argument("--shape", action='store', default="0.1,0.25,0.05", help="shape of gradient in x")
 parser.add_argument("--finger", action='store', default="7,11,14", help="fingerprint controls")
@@ -26,6 +27,7 @@ parser.add_argument('--nstep', action='store', default='200', help='number of it
 parser.add_argument('--ndiag', action='store', default=10, type=int, help='number of iterations')
 parser.add_argument('--nsave', action='store', default=20, type=int, help='number of iterations')
 parser.add_argument('--dt', action='store', default=0.1, type=float, help='time step')
+parser.add_argument('--gaussians', action='store_true', help='use Gaussians')
 parser.add_argument('--solve', action='store_true', help='run the solver')
 parser.add_argument('--trace', action='store_true', help='extract trace')
 args = parser.parse_args()
@@ -112,20 +114,35 @@ if args.solve:
     xm, ym = np.mean(x), np.mean(y)
     xx, yy = np.meshgrid(x, y)
 
-    d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
-    c0, c1 = eval(f'[{args.cx}]')
-    print(' first object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
-    ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
-    rr = np.sqrt((xx-xm+d)**2+(yy-ym)**2)
-    cx = ca - cb*erf((rr-R)/w)
-    print('cx :', np.min(cx), np.max(cx))
 
-    d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
-    c0, c1 = eval(f'[{args.cy}]')
-    print('second object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
-    ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
-    rr = np.sqrt((xx-xm-d)**2+(yy-ym)**2)
-    cy = ca - cb*erf((rr-R)/w)
+    if args.gaussians:
+
+        d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
+        c0, c1 = eval(f'[{args.cx}]')
+        print(' first object d, R =', d, R, ' c0, c1 =', c0, c1)
+        rr2 = (xx-xm+d)**2+(yy-ym)**2
+        cx = c0 + (c1-c0)*exp(-rr2/(2*R**2))
+
+        c0, c1 = eval(f'[{args.cy}]')
+        print('second object d, R =', d, R, ' c0, c1 =', c0, c1)
+        rr2 = (xx-xm-d)**2+(yy-ym)**2
+        cy = c0 + (c1-c0)*exp(-rr2/(2*R**2))
+        
+    else:
+    
+        d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
+        c0, c1 = eval(f'[{args.cx}]')
+        print(' first object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
+        ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
+        rr = np.sqrt((xx-xm+d)**2+(yy-ym)**2)
+        cx = ca - cb*erf((rr-R)/w)
+        print('cx :', np.min(cx), np.max(cx))
+
+        c0, c1 = eval(f'[{args.cy}]')
+        print('second object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
+        ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
+        rr = np.sqrt((xx-xm-d)**2+(yy-ym)**2)
+        cy = ca - cb*erf((rr-R)/w)
 
     if args.back:
         back = eval(args.back) * np.ones_like(cx)
