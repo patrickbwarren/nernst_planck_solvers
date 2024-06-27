@@ -16,7 +16,7 @@ parser.add_argument("--ionb", action='store', default="Li1OH1", help="list of io
 parser.add_argument("--cx", action='store', default="0.1,1", help="ion gradient in x")
 parser.add_argument("--cy", action='store', default="0.1,1", help="ion gradient in y")
 parser.add_argument("--back", action='store', default=None, help="background ion concentration")
-parser.add_argument("--shape", action='store', default="0.1,0.25,0.05", help="shape of gradient in x")
+parser.add_argument("--shape", action='store', default="10,25,5", help="shape of gradient in x")
 parser.add_argument("--finger", action='store', default="7,11,14", help="fingerprint controls")
 parser.add_argument('--nx', action='store', default=20, type=int, help='length of side')
 parser.add_argument('--ny', action='store', default=20, type=int, help='length of side')
@@ -113,36 +113,32 @@ if args.solve:
     x, y = np.arange(cg.nx)*dx, np.arange(cg.ny)*dy
     xm, ym = np.mean(x), np.mean(y)
     xx, yy = np.meshgrid(x, y)
-
+axes
+    d, R, w = [v for v in eval(f'[{args.shape}]')]
 
     if args.gaussians:
 
-        d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
         c0, c1 = eval(f'[{args.cx}]')
-        print(' first object d, R =', d, R, ' c0, c1 =', c0, c1)
         rr2 = (xx-xm+d)**2+(yy-ym)**2
         cx = c0 + (c1-c0)*exp(-rr2/(2*R**2))
+        print(' first Gaussian d, R =', d, R, ' c0, c1 =', c0, c1)
 
         c0, c1 = eval(f'[{args.cy}]')
-        print('second object d, R =', d, R, ' c0, c1 =', c0, c1)
         rr2 = (xx-xm-d)**2+(yy-ym)**2
         cy = c0 + (c1-c0)*exp(-rr2/(2*R**2))
-        
+        print('second Gaussian d, R =', d, R, ' c0, c1 =', c0, c1)
+
     else:
-    
-        d, R, w = [v*args.nx for v in eval(f'[{args.shape}]')]
+
         c0, c1 = eval(f'[{args.cx}]')
-        print(' first object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
-        ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
         rr = np.sqrt((xx-xm+d)**2+(yy-ym)**2)
-        cx = ca - cb*erf((rr-R)/w)
-        print('cx :', np.min(cx), np.max(cx))
+        cx = 0.5*(c0 + c1) - 0.5*(c1 - c0)*erf((rr-R)/w)
+        print(' first disc d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
 
         c0, c1 = eval(f'[{args.cy}]')
-        print('second object d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
-        ca, cb = 0.5*(c0 + c1), 0.5*(c1 - c0)
         rr = np.sqrt((xx-xm-d)**2+(yy-ym)**2)
-        cy = ca - cb*erf((rr-R)/w)
+        cy = 0.5*(c0 + c1) - 0.5*(c1 - c0)*erf((rr-R)/w)
+        print('second disc d, R, w =', d, R, w, ' c0, c1 =', c0, c1)
 
     if args.back:
         back = eval(args.back) * np.ones_like(cx)

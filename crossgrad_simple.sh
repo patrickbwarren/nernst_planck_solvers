@@ -4,7 +4,7 @@
 # - this generates sample commands to do a run.
 
 size=200
-shape=0.05,0.125,0.025
+shape=10,25,5
 run_control="--njacobi=10000 --niter=40"
 grad=0.1,1
 
