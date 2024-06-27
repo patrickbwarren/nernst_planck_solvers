@@ -4,9 +4,6 @@
 # As npeqs.py but run for a series of background salt concentrations,
 # reporting the liquid junction potential.
 
-# The --cpoly and --csalt arguments can be specified as either a pair
-# of concentrations as cI:cII, or as a single value cI = cII.
-
 import argparse
 import numpy as np
 import pandas as pd
@@ -15,7 +12,7 @@ from scipy.integrate import solve_bvp
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
 parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
-parser.add_argument('-p', '--cpoly', default='0.0:1.0', help='polymer concentrations, default 0.0:1.0')
+parser.add_argument('-p', '--cpoly', default='1.0:0.0', help='polymer concentrations, default 1.0:0.0')
 parser.add_argument('-c', '--csalt', default='0.01,10.0,41', help='background salt range, default 0.01,10.0,41')
 parser.add_argument('-v', '--verbosity', action='count', default=0, help='increasing verbosity')
 parser.add_argument('-s', '--show', action='store_true', help='plot the density profile')
@@ -26,9 +23,7 @@ Dp, Ds, Dc = eval(args.Darr)
 cpI, cpII = eval(args.cpoly.replace(':', ','))
 Δcp = cpII - cpI
 
-# convert --csalt to a logspace
-
-vals = args.csalt.split(',')
+vals = args.csalt.split(',') 
 start, end, npt = float(vals[0]), float(vals[1]), int(vals[2])
 
 def func(x, y, p):
@@ -70,13 +65,14 @@ for cs in np.logspace(log10(start), log10(end), npt):
 
     results.append((cs, Jp, Js, Δφ, ΔφH))
 
-cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'Δφ', 'Δφ(Hend)']
+cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'phi', 'phi(Hend)']
 df = pd.DataFrame(results, columns=cols)
 
 if args.show:
+
     import matplotlib.pyplot as plt
     df.set_index('cs', inplace=True)
-    df[['Δφ', 'Δφ(Hend)']].plot(logx=True)
+    df[['phi', 'phi(Hend)']].plot(logx=True)
     plt.show()
 
 elif args.output:

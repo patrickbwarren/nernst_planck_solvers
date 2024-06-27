@@ -26,12 +26,11 @@
 
 import argparse
 import numpy as np
-import pandas as pd
 from scipy.integrate import solve_bvp
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
 parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
-parser.add_argument('-p', '--cpoly', default='0.0:1.0', help='polymer concentrations, default 0.0:1.0')
+parser.add_argument('-p', '--cpoly', default='1.0:0.0', help='polymer concentrations, default 1.0:0.0')
 parser.add_argument('-c', '--csalt', default='1.0', help='background salt, default 1.0')
 parser.add_argument('-v', '--verbosity', action='count', default=0, help='increasing verbosity')
 parser.add_argument('-s', '--show', action='store_true', help='plot the density profile')
@@ -46,9 +45,6 @@ cpI, cpII = eval(double_up(args.cpoly))
 csI, csII = eval(double_up(args.csalt))
 Δcp = cpII - cpI
 Δcs = csII - csI
-
-print('cpI, cpII =', cpI, cpII)
-print('csI, csII =', csI, csII)
 
 x0 = np.linspace(0, 1, 5) # initial grid
 
@@ -71,25 +67,23 @@ def bc(ya, yb, p):
     return np.array([φ0, cp0-cpI, cp1-cpII, cs0-csI, cs1-csII])
 
 res = solve_bvp(func, bc, x0, y0, p=p0, verbose=min(2, args.verbosity))
-
-print('found parameters Jp, Js =', res.p[0], res.p[1])
-print('res.sol(0) =', res.sol(0))
-print('res.sol(1) =', res.sol(1))
-print('Δφ = ', res.sol(1)[0]-res.sol(0)[0])
     
 x = np.linspace(0, 1, 101) ; y = res.sol(x)
 φ, cp, cs = y[0], y[1], y[2]
+Δφ = res.sol(1)[0] - res.sol(0)[0]
 
 # Approximate (Henderson) solution to the NP equations
 
 σ  = (Dc+Dp)*(cpI+Δcp*x) + (Dc+Ds)*(csI+Δcs*x)
+σII = (Dc+Dp)*cpII + (Dc+Ds)*csII
 σI = (Dc+Dp)*cpI + (Dc+Ds)*csI
 Δσ = (Dc+Dp)*Δcp + (Dc+Ds)*Δcs
 Δg = (Dc-Dp)*Δcp + (Dc-Ds)*Δcs 
-
 φH = -Δg/Δσ * np.log(σ/σI)
+ΔφH = -Δg/Δσ * np.log(σII/σI)
 
 if args.show:
+
     import matplotlib.pyplot as plt
     plt.plot(x, φ-np.min(φ), 'g-', label='φ')
     plt.plot(x, φH-np.min(φH), 'g--', label='φ (Henderson)')
@@ -99,3 +93,24 @@ if args.show:
     plt.plot(x0, cs0, 'b--', label='cs (linear)')
     # plt.plot(x, cp+cs, 'r-', label='cp + cs')
     plt.legend() ; plt.xlabel("x / L") ; plt.show()
+
+elif args.output:
+
+    import pandas as pd
+    df = pd.DataFrame({'x':x, 'phi':φ-φ[0], 'cp':cp, 'cs':cs, 'phi(Hend)':φH})
+    headers = [f'{col}[{i+1}]' for i, col in enumerate(df.columns)]
+    header_row = '#  ' + '  '.join(headers)
+    data_rows = df.to_string(index=False).split('\n')[1:]
+    with open(args.output, 'w') as f:
+        print('\n'.join([header_row] + data_rows), file=f)
+    print(f'Data written to {args.output}')
+
+else:
+
+    print('cpI, cpII =', cpI, cpII)
+    print('csI, csII =', csI, csII)
+    print('Dp, Ds, Dc =', Dp, Ds, Dc)
+
+    print('Jp/Dp, Js/Ds =', res.p[0], res.p[1])
+    print('Δφ       =\t', Δφ)
+    print('Δφ(Hend) =\t', ΔφH)
