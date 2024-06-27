@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# The species / function mapping is as follows (default)
-#              z    conc    x=0   x=1    diffusion coef
-#     polymer  -1    cp      0     1     Dp (eg 0.0 for PSS)
-#      co-ion  -1    cs      α     α     Ds (eg 2.03 for Cl)
-#  counterion  +1  cp + cs               Dc (eg 1.33 for Na)
-#   potential       φ      0    ---
-#h ere are five boundary conditions in total.
+# The species mapping is as follows
+#              z    conc     x=0     x=1       diffusion coef
+#     polymer  -1    cp      cpI     cpII     Dp (eg 0.0 for PSS)
+#      co-ion  -1    cs      csI     csII     Ds (eg 2.03 for Cl)
+#  counterion  +1  cp + cs                    Dc (eg 1.33 for Na)
+#   potential        φ        0      ---
+# There are five boundary conditions in total.
 
 # The NP equations being solved are:
-#  d(φ)/dx = [ (1-Dp/Dc) Jp + (1-Ds/Dc) Js ] / (2 cp + 2 cs)
-#  d(cp)/dx = - Jp + cp d(φ)/dx
-#  d(cs)/dx = - Js + cs d(φ)/dx
-# where Jp and Js are the constant scaled fluxes, which are treated as
-# unknown parameters in the problem.  There are three functions (φ,
-# cp, cs) and two unknown parameters, which match the above.
+#  d(φ)/dx = [ (1-Dp/Dc) Jp' + (1-Ds/Dc) Js' ] / (2 cp + 2 cs)
+#  d(cp)/dx = - Jp' + cp d(φ)/dx
+#  d(cs)/dx = - Js' + cs d(φ)/dx
+# where Jp' = Jp/Dp and Js'=Js/Ds are the constant scaled fluxes,
+# which are treated as unknown parameters in the problem.  There are
+# three functions (φ, cp, cs) and two unknown parameters.
 
 # Can run calculations at cs = 0 but need to make sure that cp is not
 # also zero as a boundary condition, and vice versa.  Under such
 # conditions the Henderson approximate solution becomes exact.
+
+# The --cpoly and --csalt arguments can be specified as either a pair
+# of concentrations as cI:cII, or as a single value cI = cII.
 
 import argparse
 import numpy as np
@@ -27,8 +30,8 @@ import pandas as pd
 from scipy.integrate import solve_bvp
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
-parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs')
-parser.add_argument('-p', '--cpoly', default='0.0:1.0', help='polymer concentrations')
+parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
+parser.add_argument('-p', '--cpoly', default='0.0:1.0', help='polymer concentrations, default 0.0:1.0')
 parser.add_argument('-c', '--csalt', default='1.0', help='background salt, default 1.0')
 parser.add_argument('-v', '--verbosity', action='count', default=0, help='increasing verbosity')
 parser.add_argument('-s', '--show', action='store_true', help='plot the density profile')
@@ -51,7 +54,7 @@ x0 = np.linspace(0, 1, 5) # initial grid
 
 φ0 = np.zeros_like(x0) # zero electric field, d(φ)/dx = 0
 cp0 = cpI + Δcp*x0 # linear gradient , d(cp)/dx = (cp1-cp0)
-cs0 = csI + Δcs*x0 # uniform concentration alpha, d(cs)/dx = 0
+cs0 = csI + Δcs*x0 # also a linear gradient
 
 Jp0, Js0 = Δcp, Δcs # to correspond to the above solution
 
