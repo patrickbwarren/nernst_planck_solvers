@@ -12,9 +12,11 @@ from scipy.integrate import solve_bvp
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
 parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
-parser.add_argument('-p', '--cpoly', default='1.0:0.0', help='polymer concentrations, default 1.0:0.0')
-parser.add_argument('-c', '--csalt', default='0.01,10.0,41', help='background salt range, default 0.01,10.0,41')
+parser.add_argument('-p', '--cpoly', default='1.0:0.1', help='polymer concentrations, default 1.0:0.01')
+parser.add_argument('-c', '--csalt', default='1e-3,10.0,41', help='background salt range, default 1e-3,10.0,41')
 parser.add_argument('-v', '--verbosity', action='count', default=0, help='increasing verbosity')
+parser.add_argument('-H', '--henderson', action='store_true', help='show the Henderson profile')
+parser.add_argument('-l', '--legend', action='store_true', help='plot the legend')
 parser.add_argument('-s', '--show', action='store_true', help='plot the density profile')
 parser.add_argument('-o', '--output', help='output data for xmgrace, etc')
 args = parser.parse_args()
@@ -65,14 +67,14 @@ for cs in np.logspace(log10(start), log10(end), npt):
 
     results.append((cs, Jp, Js, Δφ, ΔφH))
 
-cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'phi', 'phi(Hend)']
+cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'Δφ', 'Δφ (Henderson)']
 df = pd.DataFrame(results, columns=cols)
 
 if args.show:
 
     import matplotlib.pyplot as plt
     df.set_index('cs', inplace=True)
-    df[['phi', 'phi(Hend)']].plot(logx=True)
+    df[['Δφ', 'Δφ (Henderson)']].plot(logx=True, style=['--', '-.'], color=['g', 'g'])
     plt.show()
 
 elif args.output:

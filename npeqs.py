@@ -33,6 +33,9 @@ parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coe
 parser.add_argument('-p', '--cpoly', default='1.0:0.0', help='polymer concentrations, default 1.0:0.0')
 parser.add_argument('-c', '--csalt', default='1.0', help='background salt, default 1.0')
 parser.add_argument('-v', '--verbosity', action='count', default=0, help='increasing verbosity')
+parser.add_argument('-H', '--henderson', action='store_true', help='show the Henderson profile')
+parser.add_argument('-t', '--total', action='store_true', help='plot the co-ion profile')
+parser.add_argument('-l', '--legend', action='store_true', help='plot the legend')
 parser.add_argument('-s', '--show', action='store_true', help='plot the density profile')
 parser.add_argument('-o', '--output', help='output data for xmgrace, etc')
 args = parser.parse_args()
@@ -85,19 +88,23 @@ x = np.linspace(0, 1, 101) ; y = res.sol(x)
 if args.show:
 
     import matplotlib.pyplot as plt
-    plt.plot(x, φ-np.min(φ), 'g-', label='φ')
-    plt.plot(x, φH-np.min(φH), 'g--', label='φ (Henderson)')
+    plt.plot(x, φ-np.min(φ), 'g--', label='φ')
     plt.plot(x, cp, 'k-', label='cp')
-    plt.plot(x0, cp0, 'k--', label='cp (linear)')
     plt.plot(x, cs, 'b-', label='cs')
-    plt.plot(x0, cs0, 'b--', label='cs (linear)')
-    # plt.plot(x, cp+cs, 'r-', label='cp + cs')
-    plt.legend() ; plt.xlabel("x / L") ; plt.show()
+    if args.henderson:
+        plt.plot(x, φH-np.min(φH), 'g-.', label='φ (Henderson)')
+        plt.plot(x0, cp0, 'k--', label='cp (linear)')
+        plt.plot(x0, cs0, 'b--', label='cs (linear)')
+    if args.total:
+        plt.plot(x, cp+cs, 'r-', label='cp + cs')
+    if args.legend:
+        plt.legend()
+    plt.xlabel("x / L") ; plt.show()
 
 elif args.output:
 
     import pandas as pd
-    df = pd.DataFrame({'x':x, 'phi':φ-φ[0], 'cp':cp, 'cs':cs, 'phi(Hend)':φH})
+    df = pd.DataFrame({'x':x, 'phi':φ-φ[0], 'cp':cp, 'cs':cs, 'cp+cs':(cp+cs), 'phi(Hend)':φH})
     headers = [f'{col}[{i+1}]' for i, col in enumerate(df.columns)]
     header_row = '#  ' + '  '.join(headers)
     data_rows = df.to_string(index=False).split('\n')[1:]
