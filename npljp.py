@@ -1,6 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Code to solve one-dimensional steady-state Nernst-Planck equations
+# for a restricted-diffusion junction connecting polymer + salt
+# reservoirs.  See J. Newman and K. E. Thomas-Alyea, Electrochemical
+# Systems, 3rd ed. (Wiley, Hoboken, NJ, 2004) for more details.
+
+# This code is copyright (c) 2024 Patrick B Warren (STFC).
+# Email: patrick.warren{at}stfc.ac.uk.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
 # As npeqs.py but run for a series of background salt concentrations,
 # reporting the liquid junction potential.
 
@@ -28,12 +46,12 @@ cpI, cpII = eval(args.cpoly.replace(':', ','))
 vals = args.csalt.split(',') 
 start, end, npt = float(vals[0]), float(vals[1]), int(vals[2])
 
-def func(x, y, p):
+def odes(x, y, p):
     φ, cp, cs, Jp, Js = y[0], y[1], y[2], p[0], p[1]
     gradφ = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js) / (2*cp + 2*cs)
     return np.vstack((gradφ, -Jp+cp*gradφ, -Js+cs*gradφ))
 
-def bc(ya, yb, p):
+def bcs(ya, yb, p):
     φ0, cp0, cs0 = ya[0], ya[1], ya[2]
     φ1, cp1, cs1 = yb[0], yb[1], yb[2]
     return np.array([φ0, cp0-cpI, cp1-cpII, cs0-cs, cs1-cs])
@@ -43,38 +61,33 @@ results = []
 for cs in np.logspace(log10(start), log10(end), npt):
 
     x0 = np.linspace(0, 1, 5) # initial grid
-
     φ0 = np.zeros_like(x0) # zero electric field, d(φ)/dx = 0
     cp0 = cpI + Δcp*x0 # linear gradient , d(cp)/dx = (cp1-cp0)
     cs0 = cs * np.ones_like(cp0) # uniform concentration, d(cs)/dx = 0
-
     Jp0, Js0 = Δcp, 0.0 # to correspond to the above solution
-
     y0, p0 = np.vstack((φ0, cp0, cs0)), np.array([Jp0, Js0])
-
-    res = solve_bvp(func, bc, x0, y0, p=p0, verbose=min(2, args.verbosity))
-
+    res = solve_bvp(odes, bcs, x0, y0, p=p0, verbose=min(2, args.verbosity))
     Jp, Js = res.p[0], res.p[1]
     Δφ = res.sol(1)[0] - res.sol(0)[0]
     
-    # Approximate (Henderson) solution to the NP equations
+    # Approximate solution to the NP equations
 
     σII  = (Dc+Dp)*cpII + (Dc+Ds)*cs
     σI = (Dc+Dp)*cpI + (Dc+Ds)*cs
     Δσ = (Dc+Dp)*Δcp
     Δg = (Dc-Dp)*Δcp
-    ΔφH = -Δg/Δσ * np.log(σII/σI)
+    Δφ_approx = -Δg/Δσ * np.log(σII/σI)
 
-    results.append((cs, Jp, Js, Δφ, ΔφH))
+    results.append((cs, Jp, Js, Δφ, Δφ_approx))
 
-cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'Δφ', 'Δφ (Henderson)']
+cols =  ['cs', 'Jp/Dp', 'Js/Ds', 'Δφ', 'Δφ (approx)']
 df = pd.DataFrame(results, columns=cols)
 
 if args.show:
 
     import matplotlib.pyplot as plt
     df.set_index('cs', inplace=True)
-    df[['Δφ', 'Δφ (Henderson)']].plot(logx=True, style=['--', '-.'], color=['g', 'g'])
+    df[['Δφ', 'Δφ (approx)']].plot(logx=True, style=['-', '-.'], color=['k', 'k'])
     plt.show()
 
 elif args.output:
