@@ -39,6 +39,10 @@
 # which are treated as unknown parameters in the problem.  There are
 # three functions (φ, cp, cs) and two unknown parameters.
 
+# Since cp + cs is a linear in x, the above ODEs can be solved
+# exactly.  This leaves only a non-linear equation set for the
+# constants of integration.
+
 # Can run calculations at cs = 0 but need to make sure that cp is not
 # also zero as a boundary condition, and vice versa.  Under such
 # conditions the approximate solution becomes exact.
@@ -48,7 +52,8 @@
 
 import argparse
 import numpy as np
-from scipy.integrate import solve_bvp
+from scipy.optimize import root
+from numpy import log as ln
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
 parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
@@ -71,29 +76,26 @@ csI, csII = eval(double_up(args.csalt))
 Δcp = cpII - cpI
 Δcs = csII - csI
 
-x0 = np.linspace(0, 1, 5) # initial grid
-φ0 = np.zeros_like(x0) # zero electric field, d(φ)/dx = 0
-cp0 = cpI + Δcp*x0 # linear gradient , d(cp)/dx = (cp1-cp0)
-cs0 = csI + Δcs*x0 # also a linear gradient
-Jp0, Js0 = Δcp, Δcs # to correspond to the above solution
+a = cpI + csI # the constant in cp + cs = a + b x
+b = Δcp + Δcs # the gradient in the same
 
-def odes(x, y, p):
-    φ, cp, cs, Jp, Js = y[0], y[1], y[2], p[0], p[1]
-    gradφ = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js) / (2*cp + 2*cs)
-    return np.vstack((gradφ, -Jp+cp*gradφ, -Js+cs*gradφ))
+def func(x):
+    A, Jp, Js = x # extract variables
+    K = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js)/2 # a derived quantity
+    cp0 = Jp/(Jp+Js)*a + A * a**(K/b) # cp at x = 0
+    cp1 = Jp/(Jp+Js)*(a+b) + A * (a+b)**(K/b) # cp at x = L
+    return([cp0-cpI, cp1-cpII, b+Jp+Js-K]) # bcs ; constraint on K
 
-def bcs(ya, yb, p):
-    φ0, cp0, cs0 = ya[0], ya[1], ya[2]
-    φ1, cp1, cs1 = yb[0], yb[1], yb[2]
-    return np.array([φ0, cp0-cpI, cp1-cpII, cs0-csI, cs1-csII])
+x0 = [0, -Δcp, -Δcs] # initial guess
+sol = root(func, x0) # solve the non-linear equation set
+A, Jp, Js = sol.x # extract the solution
+K = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js)/2 # as above, used below
+Δφ = (K/b)*ln(1 + b/a) # liquid junction potential
 
-y0, p0 = np.vstack((φ0, cp0, cs0)), np.array([Jp0, Js0])
-
-res = solve_bvp(odes, bcs, x0, y0, p=p0, verbose=min(2, args.verbosity))
-    
-x = np.linspace(0, 1, 101)
-φ, cp, cs = res.sol(x)
-Δφ = res.sol(1)[0] - res.sol(0)[0]
+x = np.linspace(0, 1, 41)
+cp = (a+b*x)*Jp/(Jp+Js) + A * (a+b*x)**(K/b) # as above
+cs = (a+b*x)*Js/(Jp+Js) - A * (a+b*x)**(K/b) # as above
+φ = (K/b)*ln(1 + b*x/a) # the solution for the potential
 
 # Approximate solution to the NP equations
 
@@ -102,8 +104,8 @@ x = np.linspace(0, 1, 101)
 σI = (Dc+Dp)*cpI + (Dc+Ds)*csI
 Δσ = (Dc+Dp)*Δcp + (Dc+Ds)*Δcs
 Δg = (Dc-Dp)*Δcp + (Dc-Ds)*Δcs 
-φ_approx = -Δg/Δσ * np.log(σ/σI)
-Δφ_approx = -Δg/Δσ * np.log(σII/σI)
+φ_approx = -Δg/Δσ * ln(σ/σI)
+Δφ_approx = -Δg/Δσ * ln(σII/σI)
 
 if args.show:
 
@@ -114,8 +116,8 @@ if args.show:
     if args.total:
         plt.plot(x, cp+cs, 'r-', label='cp + cs')
     if args.approx:
-        plt.plot(x0, cp0, 'g--', label='cp (linear)')
-        plt.plot(x0, cs0, 'b--', label='cs (linear)')
+        plt.plot([0, 1], [cpI, cpII], 'g--', label='cp (linear)')
+        plt.plot([0, 1], [csI, csII], 'b--', label='cs (linear)')
         plt.plot(x, φ_approx-φ_approx[0], 'k-.', label='φ (approx)')
     if args.legend:
         plt.legend()
@@ -131,7 +133,7 @@ elif args.output:
     data_rows = df.to_string(index=False).split('\n')[1:]
     with open(args.output, 'w') as f:
         print('\n'.join([header_row] + data_rows), file=f)
-    print(f'Data written to {args.output}')
+    print('Data', ', '.join(headers), 'written to', args.output)
 
 else:
 
@@ -139,6 +141,6 @@ else:
     print('csI, csII =', csI, csII)
     print('Dp, Ds, Dc =', Dp, Ds, Dc)
 
-    print('Jp/Dp, Js/Ds =', res.p[0], res.p[1])
-    print('Δφ          =\t', Δφ)
-    print('Δφ (approx) =\t', Δφ_approx)
+    print('Jp/Dp, Js/Ds, A =', Jp, '\t', Js, '\t', A)
+    print('Δφ           =\t', Δφ)
+    print('Δφ (approx)  =\t', Δφ_approx)

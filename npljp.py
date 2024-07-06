@@ -26,7 +26,8 @@ import argparse
 import numpy as np
 import pandas as pd
 from numpy import log10
-from scipy.integrate import solve_bvp
+from scipy.optimize import root
+from numpy import log as ln
 
 parser = argparse.ArgumentParser("Nernst-Planck steady-state")
 parser.add_argument('-D', '--Darr', default='0.0,2.03,1.33', help='diffusion coeffs, default 0.0,2.03,1.33')
@@ -46,37 +47,32 @@ cpI, cpII = eval(args.cpoly.replace(':', ','))
 vals = args.csalt.split(',') 
 start, end, npt = float(vals[0]), float(vals[1]), int(vals[2])
 
-def odes(x, y, p):
-    φ, cp, cs, Jp, Js = y[0], y[1], y[2], p[0], p[1]
-    gradφ = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js) / (2*cp + 2*cs)
-    return np.vstack((gradφ, -Jp+cp*gradφ, -Js+cs*gradφ))
-
-def bcs(ya, yb, p):
-    φ0, cp0, cs0 = ya[0], ya[1], ya[2]
-    φ1, cp1, cs1 = yb[0], yb[1], yb[2]
-    return np.array([φ0, cp0-cpI, cp1-cpII, cs0-cs, cs1-cs])
+def func(x, a, b):
+    A, Jp, Js = x # extract variables
+    K = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js)/2 # a derived quantity
+    cp0 = Jp/(Jp+Js)*a + A * a**(K/b) # cp at x = 0
+    cp1 = Jp/(Jp+Js)*(a+b) + A * (a+b)**(K/b) # cp at x = L
+    return([cp0-cpI, cp1-cpII, b+Jp+Js-K]) # bcs ; constraint on K
 
 results = []
 
 for cs in np.logspace(log10(start), log10(end), npt):
 
-    x0 = np.linspace(0, 1, 5) # initial grid
-    φ0 = np.zeros_like(x0) # zero electric field, d(φ)/dx = 0
-    cp0 = cpI + Δcp*x0 # linear gradient , d(cp)/dx = (cp1-cp0)
-    cs0 = cs * np.ones_like(cp0) # uniform concentration, d(cs)/dx = 0
-    Jp0, Js0 = Δcp, 0.0 # to correspond to the above solution
-    y0, p0 = np.vstack((φ0, cp0, cs0)), np.array([Jp0, Js0])
-    res = solve_bvp(odes, bcs, x0, y0, p=p0, verbose=min(2, args.verbosity))
-    Jp, Js = res.p[0], res.p[1]
-    Δφ = res.sol(1)[0] - res.sol(0)[0]
-    
+    a, b = cpI + cs, Δcp  # as in cp + cs = a + b x
+
+    x0 = [0, -Δcp, 0] # initial guess
+    sol = root(func, x0, args=(a, b)) # solve the non-linear equation set
+    A, Jp, Js = sol.x # extract the solution
+    K = ((1-Dp/Dc)*Jp + (1-Ds/Dc)*Js)/2 # as above, used in next
+    Δφ = (K/b)*ln(1 + b/a) # liquid junction potential
+
     # Approximate solution to the NP equations
 
     σII  = (Dc+Dp)*cpII + (Dc+Ds)*cs
     σI = (Dc+Dp)*cpI + (Dc+Ds)*cs
     Δσ = (Dc+Dp)*Δcp
     Δg = (Dc-Dp)*Δcp
-    Δφ_approx = -Δg/Δσ * np.log(σII/σI)
+    Δφ_approx = -Δg/Δσ * ln(σII/σI)
 
     results.append((cs, Jp, Js, Δφ, Δφ_approx))
 
